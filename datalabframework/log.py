@@ -13,6 +13,7 @@ import json
 
 import sys
 import os
+import git
 
 #import a few help methods
 from . import project
@@ -21,17 +22,30 @@ from . import params
 
 _logger = None
 
-def _default_json_default(obj):
-    """
-    Coerce everything to strings.
-    All objects representing time get output as ISO8601.
-    """
-    if  isinstance(obj, datetime.datetime) or \
-        isinstance(obj,datetime.date) or      \
-        isinstance(obj,datetime.time):
-        return obj.isoformat()
+def _get_session():
+    # We use git hash as session id
+    repo = git.Repo(search_parent_directories=True)
+    sha = repo.head.object.hexsha
+    return sha
+
+def _logrecord_add_attributes(record):
+    if type(record.msg) is dict and 'type' in record.msg:
+        record.type = record.msg['type']
     else:
-        return str(obj)
+        # default type
+        record.type = 'message'
+    record.session = _get_session()
+    return record
+
+class TekoFormatter(logging.Formatter):
+    def __init__(self,
+                 fmt=None,
+                 datefmt=None):
+        super().__init__(fmt, datefmt)
+
+    def format(self, record):
+        logr = _logrecord_add_attributes(record)
+        return super(TekoFormatter, self).format(logr)
 
 class LogstashFormatter(logging.Formatter):
     """
@@ -41,30 +55,8 @@ class LogstashFormatter(logging.Formatter):
 
     def __init__(self,
                  fmt=None,
-                 datefmt=None,
-                 json_cls=None,
-                 json_default=_default_json_default):
-        """
-        :param fmt: Config as a JSON string, allowed fields;
-               extra: provide extra fields always present in logs
-
-        :param datefmt: Date format to use (required by logging.Formatter interface but not used)
-        :param json_cls: JSON encoder to forward to json.dumps
-        :param json_default: Default JSON representation for unknown types, by default coerce everything to a string
-        """
-
-        if fmt is not None:
-            self._fmt = json.loads(fmt)
-        else:
-            self._fmt = {}
-
-        self.json_default = json_default
-        self.json_cls = json_cls
-
-        if 'extra' not in self._fmt:
-            self.defaults = {}
-        else:
-            self.defaults = self._fmt['extra']
+                 datefmt=None):
+        pass
 
     def format(self, record):
         """
@@ -73,34 +65,16 @@ class LogstashFormatter(logging.Formatter):
         fields.
         """
 
-        d = record.__dict__.copy()
-        loginfo = {k:d.get(k,None) for k in ['created', 'levelname', 'exc_info']}
-
-        loginfo['exception'] = None
-        if loginfo['exc_info']:
-            formatted = tb.format_exception(*loginfo['exc_info'])
-            loginfo['exception'] = formatted
-            loginfo.pop('exc_info')
-
-        info = self.defaults.copy()
-        info.update({'log_level': loginfo['levelname'],'log_exception': loginfo['exception']})
-
-        fields = dict()
-        message = None
-        if isinstance(record.msg, dict):
-            fields = record.msg
-        else:
-            message = record.getMessage()
-
-
+        logr =  _logrecord_add_attributes(record)
         timestamp = datetime.datetime.fromtimestamp(loginfo['created']).strftime('%Y-%m-%dT%H:%M:%S.%fZ')
 
-        logr = {'message': message,
-                'info': info,
+        log_record = {'severity': logr.levelname,
+                'session': session,
                 '@timestamp': timestamp,
+                'type': type,
                 'fields': fields}
 
-        return json.dumps(logr, default=self.json_default, cls=self.json_cls)
+        return json.dumps(log_record)
 
 class KafkaLoggingHandler(logging.Handler):
 
@@ -128,14 +102,20 @@ loggingLevels = {
     'fatal': logging.FATAL
 }
 
+# # TODO
+# """
+# - dynamic extra fields
+# """
+# logger.warning()
+# logger.info()
+
+# def logger.dataread(**extra):
+#     logger.info('dataread', extra)
+
 def init():
     global _logger
 
     md = params.metadata()
-
-    info = dict()
-    info.update({'username': getpass.getuser()})
-    info.update({'filename': project.filename()})
 
     logger = logging.getLogger()
     logger.handlers = []
@@ -161,17 +141,18 @@ def init():
     p = md['loggers'].get('stream')
     if p and p['enable']:
         level = loggingLevels.get(p.get('severity'))
+        format = p.get('log_format')
 
         # create console handler and set level to debug
-        formatter = logging.Formatter('%(asctime)s - %(levelname)s - {} - {} - %(message)s'.format(*info.values()))
-        handler = logging.StreamHandler(sys.stdout,)
+        handler = logging.StreamHandler(sys.stdout)
+        handler.formatter = TekoFormatter(format)
+        # TODO : Bug with set level
         handler.setLevel(level)
-        handler.setFormatter(formatter)
         logger.addHandler(handler)
 
     _logger = logger
 
-def logger():
+def getLogger():
     global _logger
     if not _logger:
         init()
