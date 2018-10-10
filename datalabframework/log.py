@@ -14,6 +14,7 @@ import json
 import sys
 import os
 import git
+import random
 
 #import a few help methods
 from . import project
@@ -25,8 +26,11 @@ _logger = None
 def _get_session():
     # We use git hash as session id
     repo = git.Repo(search_parent_directories=True)
-    sha = repo.head.object.hexsha
-    return sha
+    clean = len(repo.index.diff(None))== 0
+    if clean:
+        return repo.head.object.hexsha
+    else:
+        return 1
 
 def _logrecord_add_attributes(record):
     if type(record.msg) is dict and 'type' in record.msg:
