@@ -14,7 +14,6 @@ import json
 import sys
 import os
 import git
-import random
 
 #import a few help methods
 from . import project
@@ -30,6 +29,7 @@ def _get_session():
     if clean:
         return repo.head.object.hexsha
     else:
+        ### Something went wrong
         return 1
 
 def _logrecord_add_attributes(record):
