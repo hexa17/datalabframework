@@ -107,14 +107,9 @@ loggingLevels = {
 }
 
 # # TODO
-# """
-# - dynamic extra fields
-# """
-# logger.warning()
-# logger.info()
-
+# logging highlevel
 # def logger.dataread(**extra):
-#     logger.info('dataread', extra)
+# def logger.dataframe():
 
 def init():
     global _logger
