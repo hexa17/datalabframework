@@ -32,6 +32,21 @@ def _get_session():
         ### Something went wrong
         return 1
 
+def _get_git():
+    repo = git.Repo(search_parent_directories=True)
+    msg = {
+        ''
+        'committer': repo.head.object.committer.name,
+        'revision': repo.head.object.name_rev,
+        # How to get url
+        'url': 'https://git.teko.vn/kjad',
+        # How to get humanable time
+        'date': repo.head.object.committed_datetime,
+        'clean': len(repo.index.diff(None))== 0
+    }
+    return msg
+
+
 def _logrecord_add_attributes(record):
     if type(record.msg) is dict and 'type' in record.msg:
         record.type = record.msg['type']
@@ -98,6 +113,37 @@ class KafkaLoggingHandler(logging.Handler):
             self.producer.stop()
         logging.Handler.close(self)
 
+class DataLogging(logging.Logger):
+    def __init__(self, level):
+        logging.Logger.__init__(self, "data", level)
+
+    # def __reduce__(self):
+    #     return getLogger, ()
+
+    def session(self):
+        msg = {
+            'user': os.getlogin(),
+            'type': 'session'
+        }
+
+    def git(self, msg, *args, **kwargs):
+        msg = _get_git()
+        msg['type'] = 'git'
+        self._log(20, msg, args, **kwargs)
+
+    def project(self, msg, *args, **kwargs):
+        self._log(20, msg, args, **kwargs)
+
+    def read(self, msg, *args, **kwargs):
+        self._log(20, msg, args, **kwargs)
+
+    def write(self, msg, *args, **kwargs):
+        self._log(20, msg, args, **kwargs)
+
+    def dataframe(self, msg, *args, **kwargs):
+        self._log(20, msg, args, **kwargs)
+
+
 loggingLevels = {
     'debug': logging.DEBUG,
     'info': logging.INFO,
@@ -116,7 +162,8 @@ def init():
 
     md = params.metadata()
 
-    logger = logging.getLogger()
+    # logger = logging.getLogger()
+    logger = logger = DataLogging(10)
     logger.handlers = []
 
     p = md['loggers'].get('kafka')
