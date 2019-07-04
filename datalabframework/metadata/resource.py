@@ -26,6 +26,8 @@ def _url(d):
         url = 'jdbc:oracle:thin://{}:{}/{}'.format(d['host'], d['port'], d['database'])
     elif service == 'elastic':
         url = 'http://{}:{}/{}'.format(d['host'], d['port'], d['database'])
+    elif service == 'mongodb':
+        url = 'mongodb://{}:{}@{}:{}/{}'.format(d['username'],d['password'],d['host'], d['port'], d['database'])
     else:
         url = None
 
@@ -33,6 +35,7 @@ def _url(d):
 
 def _port(service_name):
     ports = {
+        'mongodb': 27017,
         'hdfs': 8020,
         'mysql': 3306,
         'postgres': 5432,
@@ -49,8 +52,11 @@ def _format(d):
     if d.get('service') in ['sqlite', 'mysql', 'postgres', 'mssql', 'oracle']:
         return 'jdbc'
 
-    if d.get('service') in ['elastic', 'mongodb']:
+    if d.get('service') in ['elastic']:
         return 'nosql'
+    
+    if d.get('service') in ['mongodb']:
+        return 'com.mongodb.spark.sql.DefaultSource'
 
     path = d.get('resource_path', '').split('.')
     if len(path)>1 and path[-1] in ['csv', 'json', 'jsonl']:
