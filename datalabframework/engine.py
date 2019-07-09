@@ -190,7 +190,7 @@ class SparkEngine(Engine):
 
     def __init__(self, name, md, rootdir):
         super().__init__(name, md, rootdir)
-        
+
         # set submit args via env variable
         self.set_submit_args()
 
