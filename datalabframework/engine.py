@@ -126,6 +126,8 @@ class SparkEngine(Engine):
                 packages.append('org.postgresql:postgresql:42.2.5')
             elif v['service'] == 'mssql':
                 packages.append('com.microsoft.sqlserver:mssql-jdbc:6.4.0.jre8')
+            elif v['service'] == 'mongodb':
+                packages.append('org.mongodb.spark:mongo-spark-connector_2.11:2.2.0')
 
         if packages:
             submit_packages = ','.join(packages)
@@ -236,6 +238,7 @@ class SparkEngine(Engine):
 
         prep_start = timer()
         date_column = '_date' if md['date_partition'] else md['date_column']
+                
         obj = dataframe.filter_by_date(
             obj,
             date_column,
@@ -327,7 +330,17 @@ class SparkEngine(Engine):
 
                 # load the data from jdbc
                 obj = obj.load(**kargs)
-
+                
+                                   
+            elif md['service'] == 'mongodb':
+                obj = self._ctx.read \
+                    .format(md['format']) \
+                    .option('spark.mongodb.input.uri', md['url'] + '.' + md['resource_path']) \
+                    .options(**options)
+                                   
+                # load the data                
+                obj = obj.load(**kargs)
+                                   
             elif md['service'] == 'elastic':
                 results = elastic.read(md['url'], options.get('query', {}))
                 rows = [pyspark.sql.Row(**r) for r in results]
@@ -456,6 +469,13 @@ class SparkEngine(Engine):
                     .option('password', md['password']) \
                     .options(**options) \
                     .save(**kargs)
+                                   
+            elif md['service'] == 'mongodb':
+                obj.write \
+                    .format(md['format']) \
+                    .option('spark.mongodb.input.uri', md['url'] + '.' + md['resource_path']) \
+                    .options(**options)\
+                    .save(**kargs)               
 
             elif md['service'] == 'elastic':
                 mode = kargs.get("mode", None)
