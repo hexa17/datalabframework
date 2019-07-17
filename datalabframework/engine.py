@@ -518,6 +518,12 @@ class SparkEngine(Engine):
             logging.error(log_data)
             return
 
+        # handle null field with mongodb
+        if md_src['service'] == 'mongodb':
+            for column_type in df_src.dtypes:
+                if 'null' in column_type[1]:
+                    df_src = df_src.withColumn(column_type[0], df_src[column_type[0]].cast(column_type[1].replace('null','string')))
+
         num_rows = df_src.count()
         num_cols = len(df_src.columns)
 
