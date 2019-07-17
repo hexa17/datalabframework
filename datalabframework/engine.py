@@ -335,7 +335,7 @@ class SparkEngine(Engine):
             elif md['service'] == 'mongodb':
                 obj = self._ctx.read \
                     .format(md['format']) \
-                    .option('spark.mongodb.input.uri', md['url'] + '.' + md['resource_path']) \
+                    .option('spark.mongodb.input.uri', md['url'].split('?')[0] + '.' + md['resource_path'] + '?' +md['url'].split('?')[1]) \
                     .options(**options)
                                    
                 # load the data                
@@ -473,7 +473,8 @@ class SparkEngine(Engine):
             elif md['service'] == 'mongodb':
                 obj.write \
                     .format(md['format']) \
-                    .option('spark.mongodb.input.uri', md['url'] + '.' + md['resource_path']) \
+                    .option('spark.mongodb.input.uri', md['url'].split('?')[0] + '.' + md['resource_path'] + '?' +md['url'].split('?')[1]) \
+                    .options(**options)
                     .options(**options)\
                     .save(**kargs)               
 
