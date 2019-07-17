@@ -333,9 +333,15 @@ class SparkEngine(Engine):
                 
                                    
             elif md['service'] == 'mongodb':
+
+                if '?' in md['url']:
+                    connection_str = md['url'].split('?')[0] + '.' + md['resource_path'] + '?' +md['url'].split('?')[1]
+                else:
+                    connection_str = md['url']+ '.' + md['resource_path']
+
                 obj = self._ctx.read \
                     .format(md['format']) \
-                    .option('spark.mongodb.input.uri', md['url'].split('?')[0] + '.' + md['resource_path'] + '?' +md['url'].split('?')[1]) \
+                    .option('spark.mongodb.input.uri',connection_str ) \
                     .options(**options)
                                    
                 # load the data                
@@ -471,10 +477,15 @@ class SparkEngine(Engine):
                     .save(**kargs)
                                    
             elif md['service'] == 'mongodb':
+
+                if '?' in md['url']:
+                    connection_str = md['url'].split('?')[0] + '.' + md['resource_path'] + '?' +md['url'].split('?')[1]
+                else:
+                    connection_str = md['url']+ '.' + md['resource_path']
+
                 obj.write \
                     .format(md['format']) \
-                    .option('spark.mongodb.input.uri', md['url'].split('?')[0] + '.' + md['resource_path'] + '?' +md['url'].split('?')[1]) \
-                    .options(**options)
+                    .option('spark.mongodb.input.uri', connection_str) \
                     .options(**options)\
                     .save(**kargs)               
 
