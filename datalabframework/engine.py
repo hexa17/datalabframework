@@ -608,7 +608,7 @@ class SparkEngine(Engine):
             if md_trg['state_column']:
                 df_src = df_src.withColumn('_state', F.lit(0))
             if md_trg['version_column']:
-                df_src = dataframe.add_version_column(df_src)
+                df_src = dataframe.add_version_column(df_src, tzone=self._timezone)
             result = self.save(df_src, md_trg, mode=mode)
 
             log_data['time'] = timer() - timer_start
@@ -633,7 +633,7 @@ class SparkEngine(Engine):
             if md_trg['state_column']:
                 df_src = df_src.withColumn('_state', F.lit(0))
             if md_trg['version_column']:
-                df_src = dataframe.add_version_column(df_src)
+                df_src = dataframe.add_version_column(df_src, tzone=self._timezone)
             result = self.save(df_src, md_trg, mode=mode)
 
             log_data['time'] = timer() - timer_start
@@ -677,7 +677,7 @@ class SparkEngine(Engine):
             if md_trg['version_column']:
                 version = self.find_version(md=md_trg)
                 date = datetime.strptime(version, '%Y-%m-%d-%H-%M-%S') if version else None
-                df = dataframe.add_version_column(df, version_time=date)
+                df = dataframe.add_version_column(df, version_time=date, tzone=self._timezone)
 
             result = self.save(df, md_trg, mode=mode)
         else:
