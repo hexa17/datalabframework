@@ -406,9 +406,15 @@ class SparkEngine(Engine):
                 
                                    
             elif md['service'] == 'mongodb':
+
+                if '?' in md['url']:
+                    connection_str = md['url'].split('?')[0] + '.' + md['resource_path'] + '?' +md['url'].split('?')[1]
+                else:
+                    connection_str = md['url']+ '.' + md['resource_path']
+
                 obj = self._ctx.read \
                     .format(md['format']) \
-                    .option('spark.mongodb.input.uri', md['url'] + '.' + md['resource_path']) \
+                    .option('spark.mongodb.input.uri',connection_str ) \
                     .options(**options)
                                    
                 # load the data                
@@ -547,9 +553,15 @@ class SparkEngine(Engine):
                     .save(**kargs)
                                    
             elif md['service'] == 'mongodb':
+
+                if '?' in md['url']:
+                    connection_str = md['url'].split('?')[0] + '.' + md['resource_path'] + '?' +md['url'].split('?')[1]
+                else:
+                    connection_str = md['url']+ '.' + md['resource_path']
+
                 obj.write \
                     .format(md['format']) \
-                    .option('spark.mongodb.input.uri', md['url'] + '.' + md['resource_path']) \
+                    .option('spark.mongodb.input.uri', connection_str) \
                     .options(**options)\
                     .save(**kargs)               
 
@@ -593,6 +605,12 @@ class SparkEngine(Engine):
         if df_src is None:
             logging.error(log_data)
             return
+
+        # handle null field with mongodb
+        if md_src['service'] == 'mongodb':
+            for column_type in df_src.dtypes:
+                if 'null' in column_type[1]:
+                    df_src = df_src.withColumn(column_type[0], df_src[column_type[0]].cast(column_type[1].replace('null','string')))
 
         num_rows = df_src.count()
         num_cols = len(df_src.columns)
