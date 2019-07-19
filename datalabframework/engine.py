@@ -708,8 +708,8 @@ class SparkEngine(Engine):
         try:
             if md['service'] in ['local', 'file']:
                 d = []
-                for f in os.listdir(md['url']):
-                    d.append(os.path.join(md['url'], f))
+                for f in os.listdir(md['provider_path']):
+                    d.append(os.path.join(md['provider_path'], f))
                 return d
             elif md['service'] == 'hdfs':
                 sc = self._ctx._sc
