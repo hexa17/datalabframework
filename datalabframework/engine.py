@@ -131,8 +131,11 @@ class SparkEngine(Engine):
             elif v['service'] == 'mongodb':
                 packages.append('org.mongodb.spark:mongo-spark-connector_2.11:2.2.0')
 
+            if 'format' in v and v['format'] == 'excel':
+                packages.append('com.crealytics:spark-excel_2.11:0.12.0')
+
         if packages:
-            submit_packages = ','.join(packages)
+            submit_packages = ','.join(list(set(packages)))
             submit_args = '{} --packages {}'.format(submit_args, submit_packages)
 
         #### submit: py-files
@@ -162,8 +165,8 @@ class SparkEngine(Engine):
         for v in self._metadata.get('providers', {}).values():
             if v['service'] == 'minio':
                 conf.set("spark.hadoop.fs.s3a.endpoint", 'http://{}:{}'.format(v['hostname'], v.get('port', 9000))) \
-                    .set("spark.hadoop.fs.s3a.access.key", v['access']) \
-                    .set("spark.hadoop.fs.s3a.secret.key", v['secret']) \
+                    .set("spark.hadoop.fs.s3a.access.key", v['username']) \
+                    .set("spark.hadoop.fs.s3a.secret.key", v['password']) \
                     .set("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
                     .set("spark.hadoop.fs.s3a.path.style.access", True)
                 break
@@ -229,7 +232,7 @@ class SparkEngine(Engine):
             versions = self.list(md)
         except:
             return None
-        
+
         versions = [version.split('=')[1] for version in versions if '_version=' in version]
         versions.sort(reverse=True)
 
@@ -239,7 +242,7 @@ class SparkEngine(Engine):
             for version in versions:
                 if datetime.strptime(version, '%Y-%m-%d-%H-%M-%S') <= date:
                     return version
-        
+
         return None
 
     def load_cdc(self, path=None, provider=None, date=None, catch_exception=True, **kargs):
@@ -248,7 +251,7 @@ class SparkEngine(Engine):
 
         :param date: the query datetime object
         """
-        
+
         if isinstance(path, YamlDict):
             md = path.to_dict()
         elif isinstance(path, str):
@@ -265,34 +268,34 @@ class SparkEngine(Engine):
         obj = dataframe.view(obj)
 
         return obj
-    
+
     def load_raw_cdc(self, path=None, provider=None, catch_exception=True, **kargs):
         """
         Load all version of the cdc database
-        
+
         :return: list of dataframes at each versions 
         """
-        
+
         if isinstance(path, YamlDict):
             md = path.to_dict()
         elif isinstance(path, str):
             md = get_metadata(self._rootdir, self._metadata, path, provider)
         elif isinstance(path, dict):
             md = path
-            
+
         try:
             versions = self.list(md)
             versions = [version for version in versions if '_version=' in version]
         except:
             versions = []
-            
+
         dataframes = []
         for version in versions:
             md_copy = copy.deepcopy(md)
             md_copy['url'] += '/' + version
             obj = self.load(path=md_copy, catch_exception=catch_exception, **kargs)
             dataframes.append(obj)
-            
+
         return dataframes
 
     def load(self, path=None, provider=None, catch_exception=True, **kargs):
@@ -311,7 +314,7 @@ class SparkEngine(Engine):
 
         prep_start = timer()
         date_column = '_date' if md['date_partition'] else md['date_column']
-                
+
         obj = dataframe.filter_by_date(
             obj,
             date_column,
@@ -386,6 +389,8 @@ class SparkEngine(Engine):
                     obj = self._ctx.read.option('multiLine', True).options(**options).json(md['url'], **kargs)
                 elif md['format'] == 'parquet':
                     obj = self._ctx.read.options(**options).parquet(md['url'], **kargs)
+                elif md['format'] == 'excel':
+                    obj = self._ctx.read.format("com.crealytics.spark.excel").options(**options).load(md['url'])
                 else:
                     logging.error({'md': md, 'error_msg': f'Unknown format "{md["format"]}"'})
                     return None
@@ -403,8 +408,7 @@ class SparkEngine(Engine):
 
                 # load the data from jdbc
                 obj = obj.load(**kargs)
-                
-                                   
+
             elif md['service'] == 'mongodb':
 
                 if '?' in md['url']:
@@ -416,10 +420,10 @@ class SparkEngine(Engine):
                     .format(md['format']) \
                     .option('spark.mongodb.input.uri',connection_str ) \
                     .options(**options)
-                                   
-                # load the data                
+
+                # load the data
                 obj = obj.load(**kargs)
-                                   
+
             elif md['service'] == 'elastic':
                 results = elastic.read(md['url'], options.get('query', {}))
                 rows = [pyspark.sql.Row(**r) for r in results]
