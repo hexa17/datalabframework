@@ -647,7 +647,8 @@ class SparkEngine(Engine):
             'records_add': 0,
             'records_del': 0,
             'columns': 0,
-            'time': timer() - timer_start
+            'time': timer() - timer_start,
+            'schema': self.get_schema(md_src['provider_alias'], table_name=md_src['resource_path'])
         }
 
         # could not read source, log error and return
@@ -821,6 +822,57 @@ class SparkEngine(Engine):
             raise e
 
         return []
+        
+    def get_schema(self, provider, table_name=''):
+        if isinstance(provider, YamlDict):
+            md = provider.to_dict()
+        elif isinstance(provider, str):
+            md = get_metadata(self._rootdir, self._metadata, None, provider)
+        elif isinstance(provider, dict):
+            md = provider
+        else:
+            logging.warning(f'{str(provider)} cannot be used to reference a provider')
+            return {}
+                               
+        try:
+            if md['format'] == 'jdbc':
+                if md['service'] == 'mssql':
+                    query = "(SELECT column_name, data_type FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name = '{}') as query".format(table_name)
+                elif md['service'] == 'oracle':
+                    query = "(SELECT column_name, data_type FROM ALL_TAB_COLUMNS WHERE owner='schema_name' and table_name = '{}') as query".format(table_name)
+                elif md['service'] == 'mysql':
+                    query = "(SELECT column_name, data_type FROM INFORMATION_SCHEMA.COLUMNS where table_schema='{md['database']}' AND table_name = '{}') as query".format(table_name)
+                elif md['service'] == 'pgsql':
+                    query = "(SELECT column_name, udt_name FROM INFORMATION_SCHEMA.COLUMNS where table_name = '{}') as query".format(table_name)
+                else:
+                    # vanilla query ... for other databases
+                    query = f"(SELECT column_name, data_type FROM INFORMATION_SCHEMA.COLUMNS) as query"
+
+                obj = self._ctx.read \
+                    .format('jdbc') \
+                    .option('url', md['url']) \
+                    .option("dbtable", query) \
+                    .option("driver", md['driver']) \
+                    .option("user", md['username']) \
+                    .option('password', md['password']) \
+                    .load()
+
+                # load the data from jdbc
+                schema = {}               
+                for row in obj.collect():
+                    if "(" in row['data_type']:
+                        schema[row['column_name']] = row['data_type'].split("(")[0]
+                    else:
+                        schema[row['column_name']] = row['data_type']              
+                return schema
+            else:
+                logging.error({'md': md, 'error_msg': f'List resource on service "{md["service"]}" not implemented'})
+                return {}
+        except Exception as e:
+            logging.error({'md': md, 'error_msg': str(e)})
+            raise e
+
+        return {}
 
 
 def get(name, md, rootdir):
