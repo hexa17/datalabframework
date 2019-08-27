@@ -306,6 +306,9 @@ class SparkEngine(Engine):
         elif isinstance(path, dict):
             md = path
 
+        if md['format'] == 'snapshots':
+            return self.load_snapshots(md, **kargs)
+
         core_start = timer()
         obj = self.load_dataframe(md, catch_exception, **kargs)
         core_end = timer()
@@ -439,6 +442,27 @@ class SparkEngine(Engine):
 
         return obj
 
+    def load_snapshots(self, md, timestamp=None, version=None, **kwargs):
+        obj = None
+        options = md['options']
+        version = self.find_version(timestamp, md)
+
+        if not version:
+            logging.error({'md': md, 'error': 'Invalid version to load'})
+            return None
+        try:
+            if md['service'] in ['hdfs', 's3a', 'minio']:
+                url = f'{md["url"]}/_version={version}'
+                obj = self._ctx.read.options(**options).parquet(url, **kwargs)
+            else:
+                logging.error({'md': md, 'error': f'Unknown resource service "{md["service"]}"'})
+                return obj
+
+        except Exception as e:
+            logging.error({'md': md, 'error_msg': str(e)})
+
+        return obj
+
     def save(self, obj, path=None, provider=None, **kargs):
 
         if isinstance(path, YamlDict):
@@ -447,6 +471,9 @@ class SparkEngine(Engine):
             md = get_metadata(self._rootdir, self._metadata, path, provider)
         elif isinstance(path, dict):
             md = path
+
+        if md['format'] == 'snapshots':
+            return self.save_snapshots(obj, md, **kargs)
 
         prep_start = timer()
 
@@ -555,7 +582,7 @@ class SparkEngine(Engine):
                     .option('password', md['password']) \
                     .options(**options) \
                     .save(**kargs)
-                                   
+
             elif md['service'] == 'mongodb':
 
                 if '?' in md['url']:
@@ -567,7 +594,7 @@ class SparkEngine(Engine):
                     .format(md['format']) \
                     .option('spark.mongodb.input.uri', connection_str) \
                     .options(**options)\
-                    .save(**kargs)               
+                    .save(**kargs)
 
             elif md['service'] == 'elastic':
                 mode = kargs.get("mode", None)
@@ -576,6 +603,24 @@ class SparkEngine(Engine):
             else:
                 logging.error({'md': md, 'error_msg': f'Unknown service "{md["service"]}"'})
                 return False
+        except Exception as e:
+            logging.error({'md': md, 'error_msg': str(e)})
+            raise e
+
+        return True
+
+    def save_snapshots(self, obj, md, mode='append', partitionBy=None, **kwargs):
+        options = md.get('options', {})
+
+        try:
+            if md['service'] in ['hdfs', 's3a', 'minio']:
+                obj = dataframe.add_version_column(obj)
+                partitionBy = ['_version'] + (partitionBy or [])
+                obj.write.options(**options).parquet(md['url'], mode=mode, partitionBy=partitionBy, **kwargs)
+            else:
+                logging.error({'md': md, 'error': f'Unknown resource service "{md["service"]}"'})
+                return False
+
         except Exception as e:
             logging.error({'md': md, 'error_msg': str(e)})
             raise e
@@ -651,7 +696,7 @@ class SparkEngine(Engine):
             df_trg = dataframe.empty(df_src)
 
         # if there is schema change, create new version, log notice/error and return
-        if not dataframe.compare_schema(df_src, df_trg, ['_date', '_datetime', '_updated', '_hash', '_state', '_version']):
+        if md_trg['version_column'] and not dataframe.compare_schema(df_src, df_trg, ['_date', '_datetime', '_updated', '_hash', '_state', '_version']):
             if md_trg['state_column']:
                 df_src = df_src.withColumn('_state', F.lit(0))
             if md_trg['version_column']:
@@ -670,7 +715,7 @@ class SparkEngine(Engine):
 
         # create a view from the extracted log
         df_trg = dataframe.view(df_trg)
-                               
+
         # capture added records
         df_add = dataframe.diff(df_src, df_trg, ['_date', '_datetime', '_updated', '_hash', '_state', '_version'])
         rows_add = df_add.count()
@@ -695,7 +740,7 @@ class SparkEngine(Engine):
                 df = df_add.union(df_del)
             else:
                 df = df_add
-            
+
             if md_trg['version_column']:
                 version = self.find_version(md=md_trg)
                 date = datetime.strptime(version, '%Y-%m-%d-%H-%M-%S') if version else None
