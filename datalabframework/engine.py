@@ -592,8 +592,12 @@ class SparkEngine(Engine):
 
         # logging
         log_data = {
+            'src_service': md_src['service'],
+            'src_format': md_src['format'],
             'src_hash': md_src['hash'],
             'src_path': md_src['resource_path'],
+            'trg_service': md_trg['service'],
+            'trg_format': md_trg['format'],
             'trg_hash': md_trg['hash'],
             'trg_path': md_trg['resource_path'],
             'mode': mode,
@@ -788,7 +792,6 @@ class SparkEngine(Engine):
         else:
             logging.warning(f'{str(provider)} cannot be used to reference a provider')
             return {}
-                               
         try:
             if md['format'] == 'jdbc':
                 if md['service'] == 'mssql':
@@ -796,7 +799,7 @@ class SparkEngine(Engine):
                 elif md['service'] == 'oracle':
                     query = "(SELECT column_name, data_type FROM ALL_TAB_COLUMNS WHERE owner='schema_name' and table_name = '{}') as query".format(table_name)
                 elif md['service'] == 'mysql':
-                    query = "(SELECT column_name, data_type FROM INFORMATION_SCHEMA.COLUMNS where table_schema='{md['database']}' AND table_name = '{}') as query".format(table_name)
+                    query = "(SELECT column_name, data_type FROM INFORMATION_SCHEMA.COLUMNS where table_name = '{}') as query".format(table_name)
                 elif md['service'] == 'pgsql':
                     query = "(SELECT column_name, udt_name FROM INFORMATION_SCHEMA.COLUMNS where table_name = '{}') as query".format(table_name)
                 else:

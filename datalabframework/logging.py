@@ -219,6 +219,17 @@ def init(md=None, session_id=0):
         handlerKafka.setLevel(level)
         handlerKafka.setFormatter(formatterLogstash)
         logger.addHandler(handlerKafka)
+        
+    p = md.get('loggers', {}).get('datalabframework',{}).get('file')
+    if p and p['enable'] and KafkaProducer:
+        level = levels.get(p.get('severity', 'info'))
+        filename = p.get('filename', 'dlf.log')
+            
+        formatterLogstash = LogstashFormatter()
+        handlerFile = logging.FileHandler(filename)
+        handlerFile.setLevel(level)
+        handlerFile.setFormatter(formatterLogstash)
+        logger.addHandler(handlerFile)
 
     p = md.get('loggers', {}).get('datalabframework',{}).get('stream')
     if p and p['enable']:
