@@ -63,8 +63,8 @@ class LoggerAdapter(logging.LoggerAdapter):
             'dlf_filename': os.path.relpath(files.get_current_filename(), paths.rootdir()),
             'dlf_repo_name': repo_data()['name'],
             'dlf_repo_hash': repo_data()['hash'],
-            'ci_pipeline_iid': os.environ.get('CI_PIPELINE_IID'),
-            'ci_pipeline_id': os.environ.get('CI_PIPELINE_ID'),
+            'ci_pipeline_iid': os.getenv('CI_PIPELINE_IID', default=str(uuid.uuid4())[:7]),
+            'ci_pipeline_id': os.getenv('CI_PIPELINE_ID', default=str(uuid.uuid4())[:7]),
             'gitlab_user_email': os.environ.get('GITLAB_USER_EMAIL'),
             'gitlab_user_login': os.environ.get('GITLAB_USER_LOGIN')
         }
@@ -142,6 +142,8 @@ class LogstashFormatter(logging.Formatter):
             'func': logr.dlf_func,
             'data': msg,
             'pipeline_id': logr.ci_pipeline_id,
+            'pipeline_iid': logr.ci_pipeline_iid,
+            'user_email': logr.gitlab_user_email,
             'user_login': logr.gitlab_user_login
         }
 
