@@ -63,6 +63,14 @@ properties:
                             enable:
                                 type: boolean
                         additionalProperties: false
+                    file:
+                        type: object
+                        properties:
+                            severity:
+                                type: string
+                            enable:
+                                type: boolean
+                        additionalProperties: false
                     kafka:
                         type: object
                         properties:
