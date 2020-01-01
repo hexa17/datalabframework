@@ -223,7 +223,7 @@ def init(md=None, session_id=0):
         logger.addHandler(handlerKafka)
         
     p = md.get('loggers', {}).get('datalabframework',{}).get('file')
-    if p and p['enable'] and KafkaProducer:
+    if p and p['enable']:
         level = levels.get(p.get('severity', 'info'))
         filename = p.get('filename', 'dlf.log')
             

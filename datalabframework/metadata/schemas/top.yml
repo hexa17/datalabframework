@@ -70,6 +70,8 @@ properties:
                                 type: string
                             enable:
                                 type: boolean
+                            filename:
+                                type: string
                         additionalProperties: false
                     kafka:
                         type: object
